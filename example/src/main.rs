@@ -39,10 +39,10 @@ fn main() {
     });
 
     // JSON arrays
-    let top_right = [121, 156];
+    let top_right = [121.5_f32, 156.];
     info!("position found", {
         ["position.bottom_left" : u32 = [21, 56]],
-        ["position.top_right"   : u32 = top_right],
+        ["position.top_right"   : f32 = top_right],
         // If not type is given, we assume &str - same as non-arrays
         [keys                         = ["key1", "key2"]]
     });

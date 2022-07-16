@@ -58,6 +58,9 @@ enum AtomType {
     I16,
     U8,
     I8,
+    F64,
+    F32,
+    F16,
     Usize,
     Bool,
 }
@@ -74,6 +77,9 @@ impl AtomType {
             AtomType::I16 => ("Int", Some("i64")),
             AtomType::U8 => ("Uint", Some("u64")),
             AtomType::I8 => ("Int", Some("i64")),
+            AtomType::F64 => ("Float", None),
+            AtomType::F32 => ("Float", Some("f64")),
+            AtomType::F16 => ("Float", Some("f64")),
             AtomType::Usize => ("Uint", Some("u64")),
             AtomType::Bool => ("Bool", None),
         }
@@ -91,6 +97,9 @@ const TYPE_FNS: &[(AtomType, fn(&[&TokenTree]) -> bool)] = &[
     (AtomType::I16, type_fn_i16),
     (AtomType::U8, type_fn_u8),
     (AtomType::I8, type_fn_i8),
+    (AtomType::F64, type_fn_f64),
+    (AtomType::F32, type_fn_f32),
+    (AtomType::F16, type_fn_f16),
     (AtomType::Usize, type_fn_usize),
     (AtomType::Bool, type_fn_bool),
 ];
@@ -143,6 +152,18 @@ fn type_fn_u8(tts: &[&TokenTree]) -> bool {
 
 fn type_fn_i8(tts: &[&TokenTree]) -> bool {
     type_fn_single_ident(tts, "i8")
+}
+
+fn type_fn_f64(tts: &[&TokenTree]) -> bool {
+    type_fn_single_ident(tts, "f64")
+}
+
+fn type_fn_f32(tts: &[&TokenTree]) -> bool {
+    type_fn_single_ident(tts, "f32")
+}
+
+fn type_fn_f16(tts: &[&TokenTree]) -> bool {
+    type_fn_single_ident(tts, "f16")
 }
 
 fn type_fn_usize(tts: &[&TokenTree]) -> bool {

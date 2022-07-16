@@ -8,13 +8,14 @@ Rust 1.60 or greater is required.
 
 - [x] debug, info, warn and error macros
 - [x] debug! macro compiles to no-op on release builds
+- [ ] trace macro with trace mask
 - [x] all JSON primative types (number, bool, null) supported
 - [x] one level of nested arrays
+- [ ] `Option<&[_]>` and `&[Option<_>]`
 - [x] compile-time iso timestamp feature
 - [x] quickstart print log lines to stdout
 - [ ] configurable alternative sinks for log lines
 - [ ] initialize with service name - add to all log lines
-- [ ] trace macro with trace mask
 - [ ] custom runtime logic for additional key/value(s)
 - [ ] work with ndjsonloggercore `no_std`
 

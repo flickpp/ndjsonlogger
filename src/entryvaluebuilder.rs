@@ -23,12 +23,10 @@ pub fn build_entry_value(entry_type: EntryType, value_tts: &[TokenTree]) -> Toke
 pub fn build_entry_value_array(entry_type: EntryType, value_tts: &[TokenTree]) -> TokenStream {
     match (entry_type.is_opt(), entry_type.is_str()) {
         (true, true) => {
-            // Option<&str>
-            entry_opt_str(value_tts)
+            panic!("Option<_> not supported inside array");
         }
         (true, false) => {
-            let (atom_type, primative_cast) = entry_type.atom_type();
-            entry_opt_primative(atom_type, primative_cast, value_tts)
+            panic!("Option<_> not supported inside array");
         }
         (false, true) => entry_str_array(value_tts),
         (false, false) => {
@@ -38,35 +36,13 @@ pub fn build_entry_value_array(entry_type: EntryType, value_tts: &[TokenTree]) -
     }
 }
 
+// entry_opt_str builds the Value an Option<&str>
+// ndjsonloggercore::Value::Optatom({$value}.map(|s| ndjsonloggercore::Atom::String(s))
 fn entry_opt_str(value_tts: &[TokenTree]) -> TokenStream {
-    let mut stream = TokenStream::new();
-    stream.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Value", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Optatom", Span::call_site())),
-    ]);
+    let mut stream = new_ndjsoncore_value("Optatom");
 
-    let mut s_ident = TokenStream::new();
-    s_ident.extend([TokenTree::Ident(Ident::new("s", Span::call_site()))]);
-
-    let mut map_fn = TokenStream::new();
-    map_fn.extend([
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("s", Span::call_site())),
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("String", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, s_ident)),
-    ]);
+    let mut map_fn = new_mapfn("s", "String");
+    map_fn.extend([new_single_ident_group("s", false, None)]);
 
     let mut str_option = TokenStream::new();
     str_option.extend(value_tts.iter().map(|tt| tt.to_owned()));
@@ -84,49 +60,18 @@ fn entry_opt_str(value_tts: &[TokenTree]) -> TokenStream {
     stream
 }
 
+// entry_opt_primative builds the Value of an Option<${prim}>
+// where prim is i8..i64, u8..u64, bool, usize, f16..f64
+// ndjsonloggercore::Value::Optatom(${value}.map(|p| ndjsonloggercore::Atom::${prim}(s as ${primative_cast}))
 fn entry_opt_primative(
     atom_type: &str,
     primative_cast: Option<&str>,
     value_tts: &[TokenTree],
 ) -> TokenStream {
-    let mut stream = TokenStream::new();
-    stream.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Value", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Optatom", Span::call_site())),
-    ]);
+    let mut stream = new_ndjsoncore_value("Optatom");
 
-    let mut p_ident = TokenStream::new();
-    p_ident.extend([
-        TokenTree::Punct(Punct::new('*', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("p", Span::call_site())),
-    ]);
-
-    if let Some(primative_cast) = primative_cast {
-        p_ident.extend([
-            TokenTree::Ident(Ident::new("as", Span::call_site())),
-            TokenTree::Ident(Ident::new(primative_cast, Span::call_site())),
-        ]);
-    }
-
-    let mut map_fn = TokenStream::new();
-    map_fn.extend([
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("p", Span::call_site())),
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new(atom_type, Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, p_ident)),
-    ]);
+    let mut map_fn = new_mapfn("p", atom_type);
+    map_fn.extend([new_single_ident_group("p", false, primative_cast)]);
 
     let mut option = TokenStream::new();
     option.extend(value_tts.iter().map(|tt| tt.to_owned()));
@@ -141,144 +86,87 @@ fn entry_opt_primative(
     stream
 }
 
+// entry_str builds the Value for &str
+// ndjsonloggercore::Value::Atom(ndjsonloggercore::Atom::String(${value})
 fn entry_str(value_tts: &[TokenTree]) -> TokenStream {
-    let mut stream = TokenStream::new();
+    let mut stream = new_ndjsoncore_value("Atom");
 
-    stream.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Value", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-    ]);
+    let mut inner = TokenStream::new();
+    inner.extend(value_tts.iter().map(|s| s.to_owned()));
 
-    let mut s_ident = TokenStream::new();
-    s_ident.extend(value_tts.iter().map(|s| s.to_owned()));
+    let mut atom = new_ndjsoncore_atom("String");
+    atom.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, inner))]);
 
-    let mut atom_str = TokenStream::new();
-    atom_str.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("String", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, s_ident)),
-    ]);
-
-    stream.extend([TokenTree::Group(Group::new(
-        Delimiter::Parenthesis,
-        atom_str,
-    ))]);
+    stream.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, atom))]);
     stream
 }
 
+// entry_primative builds the Value for a primative
+// ndjsonloggercore::Value::Atom(ndjsonloggercore::Atom::${atom_type}(*${value} as ${primative_cast})
 fn entry_primative(
     atom_type: &str,
     primative_cast: Option<&str>,
     value_tts: &[TokenTree],
 ) -> TokenStream {
-    let mut stream = TokenStream::new();
+    let mut stream = new_ndjsoncore_value("Atom");
 
-    stream.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Value", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-    ]);
-
-    let mut p_ident = TokenStream::new();
-    p_ident.extend(value_tts.iter().map(|p| p.to_owned()));
+    let mut inner = TokenStream::new();
+    inner.extend(value_tts.iter().map(|p| p.to_owned()));
 
     if let Some(primative_cast) = primative_cast {
-        p_ident.extend([
+        inner.extend([
             TokenTree::Ident(Ident::new("as", Span::call_site())),
             TokenTree::Ident(Ident::new(primative_cast, Span::call_site())),
         ]);
     }
 
-    let mut atom_str = TokenStream::new();
-    atom_str.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new(atom_type, Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, p_ident)),
-    ]);
+    let mut atom = new_ndjsoncore_atom(atom_type);
+    atom.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, inner))]);
 
-    stream.extend([TokenTree::Group(Group::new(
-        Delimiter::Parenthesis,
-        atom_str,
-    ))]);
+    stream.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, atom))]);
     stream
 }
 
+// entry_str_array builds the Value for a [&str]
+// ndjsonloggercore::Value::Array(
+//    &mut ${value}.iter().map(|s| ndjosnloggercore::Atom::String(s))
+// )
 fn entry_str_array(value_tts: &[TokenTree]) -> TokenStream {
-    let mut stream = TokenStream::new();
+    let mut stream = new_ndjsoncore_value("Array");
 
-    stream.extend([
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Value", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Array", Span::call_site())),
-    ]);
+    let mut map_fn = new_mapfn("s", "String");
+    map_fn.extend([new_single_ident_group("s", false, None)]);
 
-    let mut p_ident = TokenStream::new();
-    p_ident.extend([TokenTree::Ident(Ident::new("s", Span::call_site()))]);
-
-    let mut map_fn = TokenStream::new();
-    map_fn.extend([
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("s", Span::call_site())),
-        TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
-        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
-        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("String", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, p_ident)),
-    ]);
-
-    let mut iter = TokenStream::new();
-    iter.extend([
-        TokenTree::Punct(Punct::new('&', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("mut", Span::call_site())),
-    ]);
-    iter.extend(value_tts.iter().map(|p| p.to_owned()));
-    iter.extend([
-        TokenTree::Punct(Punct::new('.', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("iter", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
-        TokenTree::Punct(Punct::new('.', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("map", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, map_fn)),
-    ]);
+    let mut iter = new_iter(value_tts, false);
+    iter.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, map_fn))]);
 
     stream.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, iter))]);
     stream
 }
 
+// entry_primative_array builds the Value for a [primative]
+// ndjsonloggercore::Value::Array(
+//    &mut ${value}.iter().map(|p| ndjosnloggercore::Atom::String(*p as ${primative_cast}))
+// )
 fn entry_primative_array(
     atom_type: &str,
     primative_cast: Option<&str>,
     value_tts: &[TokenTree],
 ) -> TokenStream {
-    let mut stream = TokenStream::new();
+    let mut stream = new_ndjsoncore_value("Array");
 
+    let mut map_fn = new_mapfn("p", atom_type);
+    map_fn.extend([new_single_ident_group("p", true, primative_cast)]);
+
+    let mut iter = new_iter(value_tts, false);
+    iter.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, map_fn))]);
+
+    stream.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, iter))]);
+    stream
+}
+
+fn new_ndjsoncore_value(value_variant: &str) -> TokenStream {
+    let mut stream = TokenStream::new();
     stream.extend([
         TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
@@ -286,26 +174,48 @@ fn entry_primative_array(
         TokenTree::Ident(Ident::new("Value", Span::call_site())),
         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("Array", Span::call_site())),
+        TokenTree::Ident(Ident::new(value_variant, Span::call_site())),
     ]);
+    stream
+}
 
-    let mut p_ident = TokenStream::new();
-    p_ident.extend([
-        TokenTree::Punct(Punct::new('*', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("p", Span::call_site())),
+fn new_ndjsoncore_atom(variant: &str) -> TokenStream {
+    let mut stream = TokenStream::new();
+    stream.extend([
+        TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+        TokenTree::Ident(Ident::new("Atom", Span::call_site())),
+        TokenTree::Punct(Punct::new(':', Spacing::Joint)),
+        TokenTree::Punct(Punct::new(':', Spacing::Alone)),
+        TokenTree::Ident(Ident::new(variant, Span::call_site())),
     ]);
+    stream
+}
+
+// ($ident) or (*$ident as $primative_cast)
+fn new_single_ident_group(ident: &str, deref: bool, primative_cast: Option<&str>) -> TokenTree {
+    let mut ident_group = TokenStream::new();
+    if deref {
+        ident_group.extend([TokenTree::Punct(Punct::new('*', Spacing::Alone))]);
+    }
+    ident_group.extend([TokenTree::Ident(Ident::new(ident, Span::call_site()))]);
 
     if let Some(primative_cast) = primative_cast {
-        p_ident.extend([
+        ident_group.extend([
             TokenTree::Ident(Ident::new("as", Span::call_site())),
             TokenTree::Ident(Ident::new(primative_cast, Span::call_site())),
         ]);
     }
 
+    TokenTree::Group(Group::new(Delimiter::Parenthesis, ident_group))
+}
+
+fn new_mapfn(ident: &str, atom_type: &str) -> TokenStream {
     let mut map_fn = TokenStream::new();
     map_fn.extend([
         TokenTree::Punct(Punct::new('|', Spacing::Alone)),
-        TokenTree::Ident(Ident::new("p", Span::call_site())),
+        TokenTree::Ident(Ident::new(ident, Span::call_site())),
         TokenTree::Punct(Punct::new('|', Spacing::Alone)),
         TokenTree::Ident(Ident::new("ndjsonloggercore", Span::call_site())),
         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
@@ -314,24 +224,34 @@ fn entry_primative_array(
         TokenTree::Punct(Punct::new(':', Spacing::Joint)),
         TokenTree::Punct(Punct::new(':', Spacing::Alone)),
         TokenTree::Ident(Ident::new(atom_type, Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, p_ident)),
     ]);
+    map_fn
+}
 
-    let mut iter = TokenStream::new();
-    iter.extend([
+fn new_iter(tts: &[TokenTree], flatten: bool) -> TokenStream {
+    let mut stream = TokenStream::new();
+    stream.extend([
         TokenTree::Punct(Punct::new('&', Spacing::Alone)),
         TokenTree::Ident(Ident::new("mut", Span::call_site())),
     ]);
-    iter.extend(value_tts.iter().map(|p| p.to_owned()));
-    iter.extend([
+
+    stream.extend(tts.iter().map(|tt| tt.to_owned()));
+    stream.extend([
         TokenTree::Punct(Punct::new('.', Spacing::Alone)),
         TokenTree::Ident(Ident::new("iter", Span::call_site())),
         TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+    ]);
+    if flatten {
+        stream.extend([
+            TokenTree::Punct(Punct::new('.', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("flatten", Span::call_site())),
+            TokenTree::Group(Group::new(Delimiter::Parenthesis, TokenStream::new())),
+        ]);
+    }
+    stream.extend([
         TokenTree::Punct(Punct::new('.', Spacing::Alone)),
         TokenTree::Ident(Ident::new("map", Span::call_site())),
-        TokenTree::Group(Group::new(Delimiter::Parenthesis, map_fn)),
     ]);
 
-    stream.extend([TokenTree::Group(Group::new(Delimiter::Parenthesis, iter))]);
     stream
 }

@@ -21,9 +21,12 @@ fn main() {
     let request_type = "fetch image";
     let status_code: u16 = 200;
     info!("http request complete", {
-        "http.status_code" : u16 = status_code,
+        "http.status_code" : u16  = status_code,
         request_type,
-        image_id           : u64 = 14335072086939106204_u64
+        image_id           : u64  = 14335072086939106204_u64,
+        // We MAY give a &str type but this will be assumed
+        // if the type is omitted entirely
+        a_string           : &str = "hello world"
     });
 
     // JSON null and Option
@@ -45,5 +48,13 @@ fn main() {
         ["position.top_right"   : f32 = top_right],
         // If not type is given, we assume &str - same as non-arrays
         [keys                         = ["key1", "key2"]]
+    });
+
+    // We try to support special values gracefully
+    info!("special values", {
+        // This will serialize as a string
+        number : f64 = f64::INFINITY,
+        // Put tab character into key
+        "odd_\t_key" = "boo to a goose\r\nand you!\r\n"
     });
 }

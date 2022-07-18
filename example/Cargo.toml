@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 ndjsonlogger = {path = "../"}
-ndjsonloggercore = {path = "../../ndjsonloggercore", features = ["std", "isotimestamp"]}
+ndjsonloggercore = {version = "0.1", features = ["std", "isotimestamp"]}
